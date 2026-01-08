@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { User, Role } from '../models/index.js';
 import { successPaginatedResponse, successResponse, errorResponse } from '../utils/response.js';
 import logger from '../utils/logger.js';
-import { createUserSchema, updateUserSchema } from '../validators/user.validator.js';
+import { createUserSchema, updateUserSchema, updateMyProfileSchema } from '../validators/user.validator.js';
 import mongoose from 'mongoose';
 import { uploadToS3 } from '../utils/s3-service.js';
 
@@ -61,6 +61,57 @@ export async function getAllUsers(req: Request, res: Response): Promise<void> {
   }
 }
 
+
+export async function getUserById(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.params.id;
+
+    // Validate user ID
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      errorResponse(res, 'Invalid user ID', null, 400);
+      return;
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId)
+      .select('-password') // Exclude password
+      .populate('roles', 'name code permissions') // Populate roles
+      .exec();
+
+    if (!user) {
+      errorResponse(res, 'User not found', null, 404);
+      return;
+    }
+
+    // Format roles for response
+    const roleCodes: string[] = [];
+    if (user.roles && Array.isArray(user.roles)) {
+      for (const role of user.roles) {
+        if (role && typeof role === 'object' && 'code' in role) {
+          roleCodes.push((role as any).code);
+        }
+      }
+    }
+
+    // Prepare user data
+    const userData = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      mobileNumber: user.mobileNumber,
+      roles: roleCodes,
+      active: user.active,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    successResponse(res, 'User retrieved successfully', userData, 200);
+  } catch (error) {
+    logger.error('Get user by ID error:', error);
+    errorResponse(res, 'Failed to retrieve user', error, 500);
+  }
+}
 
 export async function createUser(req: Request, res: Response): Promise<void> {
   try {
@@ -387,6 +438,186 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
   } catch (error) {
     logger.error('Delete user error:', error);
     errorResponse(res, 'Failed to delete user', error, 500);
+  }
+}
+
+
+export async function getMyProfile(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      errorResponse(res, 'User ID not found in token', null, 401);
+      return;
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId)
+      .select('-password') // Exclude password
+      .populate('roles', 'name code permissions') // Populate roles
+      .exec();
+
+    if (!user) {
+      errorResponse(res, 'User not found', null, 404);
+      return;
+    }
+
+    // Format roles for response
+    const roleCodes: string[] = [];
+    if (user.roles && Array.isArray(user.roles)) {
+      for (const role of user.roles) {
+        if (role && typeof role === 'object' && 'code' in role) {
+          roleCodes.push((role as any).code);
+        }
+      }
+    }
+
+    // Prepare user data
+    const userData = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      mobileNumber: user.mobileNumber,
+      roles: roleCodes,
+      active: user.active,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    successResponse(res, 'Profile retrieved successfully', userData, 200);
+  } catch (error) {
+    logger.error('Get my profile error:', error);
+    errorResponse(res, 'Failed to retrieve profile', error, 500);
+  }
+}
+
+
+export async function updateMyProfile(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      errorResponse(res, 'User ID not found in token', null, 401);
+      return;
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      errorResponse(res, 'User not found', null, 404);
+      return;
+    }
+
+    // Remove roles and active from body if present (users cannot update these themselves)
+    const { roles, active, ...bodyWithoutRestricted } = req.body;
+
+    let parsedBody = { ...bodyWithoutRestricted };
+
+    // Process file upload if provided
+    let profilePictureUrl: string | undefined = undefined;
+    
+    if (req.file) {
+      const uploadResult = await uploadToS3(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+      
+      if (!uploadResult.success || !uploadResult.url) {
+        errorResponse(
+          res,
+          uploadResult.error || 'Failed to upload profile picture',
+          null,
+          400
+        );
+        return;
+      }
+      
+      profilePictureUrl = uploadResult.url;
+    }
+
+    const bodyForValidation = {
+      ...parsedBody,
+      ...(profilePictureUrl && { profilePicture: profilePictureUrl }),
+    };
+
+    const { error, value } = updateMyProfileSchema.validate(bodyForValidation);
+    if (error) {
+      const formattedErrors = error.details.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      errorResponse(res, 'Validation failed', formattedErrors, 400);
+      return;
+    }
+
+    const { name, email, password, profilePicture, mobileNumber } = value;
+
+    // Check if email is being updated and if it's already taken
+    if (email && email.toLowerCase().trim() !== user.email) {
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+      if (existingUser) {
+        errorResponse(res, 'User with this email already exists', null, 409);
+        return;
+      }
+    }
+
+    // Update fields if provided
+    if (name !== undefined) user.name = name.trim();
+    if (password !== undefined) user.password = password; // Will be hashed by pre-save hook
+    if (profilePicture !== undefined) user.profilePicture = profilePicture || null;
+    if (mobileNumber !== undefined) user.mobileNumber = mobileNumber || null;
+    if (email !== undefined) user.email = email.toLowerCase().trim();
+
+    // Save user
+    await user.save();
+
+    // Fetch updated user with populated roles
+    const updatedUser = await User.findById(userId)
+      .select('-password')
+      .populate('roles', 'name code')
+      .exec();
+
+    if (!updatedUser) {
+      errorResponse(res, 'Failed to retrieve updated user', null, 500);
+      return;
+    }
+
+    // Format roles for response
+    const roleCodes: string[] = [];
+    if (updatedUser.roles && Array.isArray(updatedUser.roles)) {
+      for (const role of updatedUser.roles) {
+        if (role && typeof role === 'object' && 'code' in role) {
+          roleCodes.push((role as any).code);
+        }
+      }
+    }
+
+    // Prepare user data
+    const userData = {
+      id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      profilePicture: updatedUser.profilePicture,
+      mobileNumber: updatedUser.mobileNumber,
+      roles: roleCodes,
+      active: updatedUser.active,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+    };
+
+    successResponse(res, 'Profile updated successfully', userData, 200);
+  } catch (error: any) {
+    logger.error('Update my profile error:', error);
+    
+    // Handle duplicate key error (MongoDB unique constraint)
+    if (error.code === 11000) {
+      errorResponse(res, 'User with this email already exists', null, 409);
+      return;
+    }
+    
+    errorResponse(res, 'Failed to update profile', error, 500);
   }
 }
 
