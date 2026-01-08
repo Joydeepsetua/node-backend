@@ -87,7 +87,7 @@ export async function handleConnectionError(error: Error): Promise<void> {
     isConnected = false;
 
     // Attempt to reconnect after a delay
-    const reconnectDelay = parseInt(process.env.MONGODB_RECONNECT_DELAY || '5000', 10);
+    const reconnectDelay = 5000;
 
     setTimeout(async () => {
         try {
