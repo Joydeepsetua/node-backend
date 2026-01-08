@@ -355,3 +355,38 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
   }
 }
 
+
+export async function deleteUser(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.params.id;
+
+    // Validate user ID
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      errorResponse(res, 'Invalid user ID', null, 400);
+      return;
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      errorResponse(res, 'User not found', null, 404);
+      return;
+    }
+
+    // Check if user is already inactive
+    if (!user.active) {
+      errorResponse(res, 'User is already deleted', null, 400);
+      return;
+    }
+
+    // Soft delete: set active to false
+    user.active = false;
+    await user.save();
+
+    successResponse(res, 'User deleted successfully', null, 200);
+  } catch (error) {
+    logger.error('Delete user error:', error);
+    errorResponse(res, 'Failed to delete user', error, 500);
+  }
+}
+
