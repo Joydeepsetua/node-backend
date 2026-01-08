@@ -16,9 +16,6 @@ const allowedImageTypes = [
   'image/x-icon',
 ];
 
-/**
- * Middleware that accepts only image files
- */
 const imageUploadMiddleware = multer({
   storage: memoryStorage,
   limits: {
@@ -28,9 +25,9 @@ const imageUploadMiddleware = multer({
     if (allowedImageTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed!'));
+      cb(new Error('Only image files are allowed (JPEG, PNG, GIF, WebP, SVG, BMP, TIFF, ICO)!'));
     }
   },
-}).any();
+}).single('profilePicture'); // Use single() for one file with field name 'profilePicture'
 
 export default imageUploadMiddleware;
