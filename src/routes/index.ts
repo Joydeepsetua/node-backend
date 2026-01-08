@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
-import { corsOptions } from '../middlewares/cors';
+import { corsOptions } from '../middlewares/cors.middleware';
 import cors from 'cors';
-import { notFoundHandler, errorHandler } from '../middlewares/errorHandler';
+import { notFoundHandler, errorHandler } from '../middlewares/errorHandler.middleware';
 import { successResponse } from '../utils/response';
 import authRoutes from './auth.routes.js';
 import userRoutes from './user.routes.js';
