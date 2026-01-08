@@ -4,6 +4,8 @@ import cors from 'cors';
 import { notFoundHandler, errorHandler } from '../middlewares/errorHandler';
 import { successResponse } from '../utils/response';
 import authRoutes from './auth.routes.js';
+import userRoutes from './user.routes.js';
+import { authenticate } from 'middlewares/auth.middleware';
 
 
 // Create Express app
@@ -24,6 +26,7 @@ app.get('/', (req: Request, res: Response) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', authenticate, userRoutes);
 
 // app.use('/api/admin', adminRoutes);
 
