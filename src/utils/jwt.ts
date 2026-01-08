@@ -29,8 +29,8 @@ function getJwtRefreshSecret(): string {
 
 function getTokenExpiration(type: 'access' | 'refresh'): string {
   const expiresIn = type === 'access' 
-    ? process.env.ACCESS_EXPIRES_IN 
-    : process.env.REFRESH_EXPIRES_IN;
+    ? process.env.JWT_ACCESS_EXPIRES_IN 
+    : process.env.JWT_REFRESH_EXPIRES_IN;
 
   if (!expiresIn) {
     throw new JwtError(

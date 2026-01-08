@@ -3,6 +3,7 @@ import { corsOptions } from '../middlewares/cors';
 import cors from 'cors';
 import { notFoundHandler, errorHandler } from '../middlewares/errorHandler';
 import { successResponse } from '../utils/response';
+import authRoutes from './auth.routes.js';
 
 
 // Create Express app
@@ -21,6 +22,8 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 
+// API routes
+app.use('/api/auth', authRoutes);
 
 // app.use('/api/admin', adminRoutes);
 
