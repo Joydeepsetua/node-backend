@@ -5,6 +5,7 @@ import logger from '../utils/logger.js';
 import { createUserSchema, updateUserSchema, updateMyProfileSchema } from '../validators/user.validator.js';
 import mongoose from 'mongoose';
 import { uploadToS3 } from '../utils/s3-service.js';
+import compressImage from '../utils/image-compression.js';
 
 
 export async function getAllUsers(req: Request, res: Response): Promise<void> {
@@ -141,10 +142,16 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     let profilePictureUrl: string | null = null;
     
     if (req.file) {
+      // Compress image before upload
+      const compressedBuffer = await compressImage(req.file.buffer);
+      
+      // Update file extension to .jpg since we're converting to JPEG
+      const fileName = req.file.originalname.replace(/\.[^/.]+$/, '.jpg');
+      
       const uploadResult = await uploadToS3(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
+        compressedBuffer,
+        fileName,
+        'image/jpeg'
       );
       
       if (!uploadResult.success || !uploadResult.url) {
@@ -287,10 +294,16 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     let profilePictureUrl: string | undefined = undefined;
     
     if (req.file) {
+      // Compress image before upload
+      const compressedBuffer = await compressImage(req.file.buffer);
+      
+      // Update file extension to .jpg since we're converting to JPEG
+      const fileName = req.file.originalname.replace(/\.[^/.]+$/, '.jpg');
+      
       const uploadResult = await uploadToS3(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
+        compressedBuffer,
+        fileName,
+        'image/jpeg'
       );
       
       if (!uploadResult.success || !uploadResult.url) {
@@ -518,10 +531,16 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
     let profilePictureUrl: string | undefined = undefined;
     
     if (req.file) {
+      // Compress image before upload
+      const compressedBuffer = await compressImage(req.file.buffer);
+      
+      // Update file extension to .jpg since we're converting to JPEG
+      const fileName = req.file.originalname.replace(/\.[^/.]+$/, '.jpg');
+      
       const uploadResult = await uploadToS3(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
+        compressedBuffer,
+        fileName,
+        'image/jpeg'
       );
       
       if (!uploadResult.success || !uploadResult.url) {
