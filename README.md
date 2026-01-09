@@ -8,7 +8,7 @@ A robust Node.js backend API built with Express, TypeScript, MongoDB, and JWT au
 
 1. **Clone the repository** (if applicable) or navigate to the project directory:
    ```bash
-   cd node-task
+   cd node-backend
    ```
 
 2. **Install dependencies**:
